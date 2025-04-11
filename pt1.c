@@ -62,9 +62,9 @@ void *count_array(void *myID)
 					// count up our section of the global array
   for ( i = startPos; i < endPos; i++) {
 	for ( j = 0; j < STRING_SIZE; j++ ) {
-	         theChar = char_array[i][j];
-		 charLoc = ((int) theChar) - 97;
-		 local_char_count[charLoc]++;
+	    theChar = char_array[i][j];
+		charLoc = ((int) theChar) - 97;
+		local_char_count[charLoc]++;
 	}
   }
 					// sum up the partial counts into the global arrays
@@ -103,11 +103,11 @@ main() {
 	init_arrays();
 
 	for (i = 0; i < NUM_THREADS; i++ ) {
-	      rc = pthread_create(&threads[i], &attr, count_array, (void *)i);
-	      if (rc) {
-	        printf("ERROR; return code from pthread_create() is %d\n", rc);
-		exit(-1);
-	      }
+	    rc = pthread_create(&threads[i], &attr, count_array, (void *)i);
+	    if (rc) {
+	    	printf("ERROR; return code from pthread_create() is %d\n", rc);
+			exit(-1);
+	    }
 	}
 
 	/* Free attribute and wait for the other threads */
