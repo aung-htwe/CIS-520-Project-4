@@ -26,7 +26,11 @@ typedef struct {
 int max_ascii(const char* str){
 	int max = 0;
 
-	//some calculation
+	for (int i = 0; str[i] != '\0'; i++) {
+        if ((unsigned char)str[i] > max) {
+            max = (unsigned char)str[i];
+        }
+    }
 
 	return max;
 }
