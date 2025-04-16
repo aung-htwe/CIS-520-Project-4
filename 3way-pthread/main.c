@@ -5,10 +5,10 @@
 
 #define NUM_THREADS 20
 #define MAX_LINES 1000000
-#define MAX_LINE_LENGTH 2001
+#define MAX_LINE_LENGTH 4000
 
 char lines[MAX_LINES][MAX_LINE_LENGTH]; // Buffer to store all lines
-int max_values[MAX_LINES];
+int* max_values;
 
 pthread_mutex_t lock;					// Mutex for thread-safe updating
 
@@ -39,27 +39,18 @@ int max_ascii(const char* str){
 /// \param arg The sole argument passed to the starting routine
 /// \return nothing
 void *calculate_lines(void *thread_arg){
-	int i, j;
-	int max;
-
-	//char* line = (char*) malloc (MAX_LINE_LENGTH);	// no lines larger than 2000 chars
+	int i, max;
 
 	ThreadLocation *thread_location = (ThreadLocation *) thread_arg;
 	int start = thread_location->start;
 	int end = thread_location->end;
-	/*
-	while (start != end){
-		fscanf(thread_location->fd, "%[^\n]\n", line);
 
-	}
-	*/
-	
 	for (i = start; i < end; i++) {
 		max = max_ascii(lines[i]);
 
 		//Protect access to shared result array
 		pthread_mutex_lock(&lock);
-		max_values[i] += max; 
+		max_values[i] = max;
 		pthread_mutex_unlock(&lock);
   	}
 
@@ -70,27 +61,29 @@ void *calculate_lines(void *thread_arg){
 /// Main program that implements parallel programming with threads
 int main(){
 	// open file
-    FILE *fd = fopen("/homes/dan/625/wiki_dump.txt", "r");
+    	FILE *fd = fopen("/homes/dan/625/wiki_dump.txt", "r");
 	if(fd == NULL){
 		printf("ERROR; Failed to open file");
 		exit(EXIT_FAILURE);
 	}
 
+	max_values = (int*) malloc(MAX_LINES * sizeof(int));
+
 	pthread_mutex_init(&lock, NULL);
 
 	int total_lines = 0;
 
-    // Read all lines into memory
-    while (fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL && total_lines < MAX_LINES) {
-        // Strip newline if needed
-        lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
-        total_lines++;
-    }
-    fclose(fd);
+	// Read all lines into memory
+    	while (fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL && total_lines < MAX_LINES) {
+        	// Strip newline if needed
+        	lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
+        	total_lines++;
+    	}
+    	fclose(fd);
 
 	// declare threads and ids
 	pthread_t threads[NUM_THREADS];
-	
+
 	// return code for error checking
 	int rc;
 
@@ -112,18 +105,6 @@ int main(){
 
 	}
 
-	//condensed
-	/*
-	for (int i = 0; i < NUM_THREADS; i++){
-		rc = pthread_create(&threads[i], NULL, calculate_lines, (void *) &thread_locations[i]);
-		if (rc) {
-	    	printf("ERROR; return code from pthread_create() is %d\n", rc);
-			exit(-1);
-	    }
-
-	}
-	*/
-	
 	//waits until all threads are done
 	for (int i = 0; i < NUM_THREADS; i++ ) {
 		pthread_join(threads[i], NULL);
@@ -132,7 +113,8 @@ int main(){
 	pthread_mutex_destroy(&lock);
 
 	// Print first 10 results as sample
-	for (int i = 0; i < 10 && i < total_lines; i++) {
+	for (int i = 0; i < 50 && i < total_lines; i++) {
+	//printf("Line %d: %s\n", i, lines[i]);
     	printf("Line %d max ASCII: %d\n", i, max_values[i]);
     }
 
