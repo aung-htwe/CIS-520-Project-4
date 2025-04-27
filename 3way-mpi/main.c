@@ -4,12 +4,12 @@
 #include <string.h>
 
 #define MAX_LINES 1000000
-#define MAX_LINE_LENGTH 4000
+#define MAX_LINE_LENGTH 3000
 
-char lines[MAX_LINES][MAX_LINE_LENGTH]; // Buffer to store all lines
+//char lines[MAX_LINES][MAX_LINE_LENGTH]; // Buffer to store all lines
 int* max_values;
 
-//taken from the 3 way pthread 
+//taken from the 3 way pthread
 /// Function to calculate the max ASCII value of a given string 
 /// \param str The line passed in to calculate
 /// \return the max ASCII value
@@ -17,10 +17,10 @@ int max_ascii(const char* str){
 	int max = 0;
 
 	for (int i = 0; str[i] != '\0'; i++) {
-        if ((unsigned char)str[i] > max) {
-            max = (unsigned char)str[i];
-        }
-    }
+        	if ((unsigned char)str[i] > max) {
+            		max = (unsigned char)str[i];
+        	}
+	}
 
 	return max;
 }
@@ -38,9 +38,6 @@ Change MPI_Init(2, &argv)
 int main(int argc, char *argv[]){
 	int rank, size;
 
-	//This might not be right for the next ONE line of commented code
-	//char *argv[] = ["./main.c", "/homes/dan/625/wiki_dump.txt"];
-
 	// initialize MPI
 	MPI_Init(&argc, &argv);
 	//MPI_Init(2, &argv);
@@ -49,57 +46,106 @@ int main(int argc, char *argv[]){
 
 	//No File Designated
 	if (argc < 2) {
-    	if (rank == 0){
+    		if (rank == 0){
 			fprintf(stderr, "Usage: %s <input_file>\n", argv[0]);
-		}     
-        MPI_Finalize();
-        return 1;
-    }
+			MPI_Finalize();
+        		return 1;
+	    	}
+	}
 
 	int total_lines = 0;
 
+	char **lines =(char**)malloc(MAX_LINES * sizeof(char*));
+	if (lines == NULL){
+		printf("ERROR; Failed to allocate memory for lines\n");
+		MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+
+	for (int i = 0; i < MAX_LINES; i++){
+		lines[i] = (char*)malloc(MAX_LINE_LENGTH * sizeof(char));
+		if (lines[i] == NULL){
+			printf("ERROR; failed to allocate memory for lines");
+			MPI_Abort(MPI_COMM_WORLD, 1);
+		}
+	}
+
+
 	// get number of tasks and load project file
 	if (rank == 0) {
-        FILE *fd = fopen(argv[1], "r");
-        if (fd == NULL) {
-            printf("ERROR; Failed to open file\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+        	FILE *fd = fopen(argv[1], "r");
+        	if (fd == NULL) {
+            		printf("ERROR; Failed to open file\n");
+            		MPI_Abort(MPI_COMM_WORLD, 1);
+        		return 1;
+		}
 
-        while (fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL && total_lines < MAX_LINES) {
-            lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
-            total_lines++;
-        }
+        	while (total_lines < MAX_LINES && fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL) {
+	            	lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
+	            	total_lines++;
+        	}
+
         fclose(fd);
-    }
+
+	}
 
 	//broadcast total line count
 	MPI_Bcast(&total_lines, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-	//Calculate distribution
+	//Calculate distribution. Extra of 0 or 1 depending on if total number of processes are odd or even
 	int lines_per_proc = total_lines / size;
 	int extra = total_lines % size;
 
-	int primary_count = lines_per_proc + (rank < extra ? 1 : 0);
-    int primary_offset = rank * lines_per_proc + (rank < extra ? rank : extra);
+	int primary_count = lines_per_proc + (extra > 0 ? 1 : 0);
 
-    // Prepare local buffer
-    char (*local_lines)[MAX_LINE_LENGTH] = malloc(primary_count * MAX_LINE_LENGTH);
+	// Prepare local buffer. Used to store proceses' distribution of lines
+	char *local_lines_buffer = (char*) malloc(primary_count * MAX_LINE_LENGTH);
+	if (local_lines_buffer == NULL){
+		fprintf(stderr, "ERROR: Memory allocation failed for local lines buffer\n");
+		MPI_Abort(MPI_COMM_WORLD, 1);
 
-	//We Send Chunks of the data to be processed
-	if(rank == 0){
-		for(int i = 1; i < size; i++){
-			int local_count = lines_per_proc + (i < extra ? 1 : 0);
-			int local_offset = i * lines_per_proc + (i < extra ? 1 : 0);
-			//this performs a blocking send. Same as calling a thread to perform this action.
-			MPI_Send(&all_lines[local_offset], local_count * MAX_LINE_LENGTH, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+	}
+
+	char **local_lines = (char**) malloc(primary_count * sizeof(char*));
+	if (local_lines == NULL)
+	{
+		fprintf(stderr, "ERROR: Memory allocation failed for local lines\n");
+		MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+
+	for (int i = 0; i < primary_count; i++){
+		local_lines[i] = local_lines_buffer + i * MAX_LINE_LENGTH;
+	}
+
+	/*
+	for (int i = 0; i < primary_count; i++){
+		local_lines[i] = (char*) malloc(MAX_LINE_LENGTH * sizeof(char));
+		if (local_lines[i] == NULL){
+			printf("ERROR; failed to allocate memory for lines");
+			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
-		memcpy(local_lines, &all_lines[0], primary_count * MAX_LINE_LENGTH);
+	}
+
+	*/
+
+	// If in master rank, send lines of file to slaves.
+	if(rank == 0){
+		// for all slave ranks, send from local_lines 
+		for(int i = 1; i < size; i++){
+			int local_count = lines_per_proc;
+			int local_offset = i * local_count;
+
+			MPI_Send(&(lines[local_offset][0]), local_count * MAX_LINE_LENGTH, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+			// MPI_Send(lines[local_offset], local_count * MAX_LINE_LENGTH, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+		}
+
+		// in master rank, directly copy into local_lines from lines
+		for (int i = 0; i < primary_count; i++)
+			memcpy(local_lines[i], lines[i], MAX_LINE_LENGTH);
 	}
 	else{
 		//included in examples I found
 		// recieves data
-		MPI_Recv(local_lines, primary_count * MAX_LINE_LENGTH, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(local_lines_buffer, primary_count * MAX_LINE_LENGTH, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	//calculate max ASCII values for local lines
@@ -111,7 +157,7 @@ int main(int argc, char *argv[]){
 	//Gather results at root
 	int *recv_counts = NULL;
 	int *displs = NULL;
-	if(rank == 0;){
+	if(rank == 0){
 		recv_counts = malloc(sizeof(int) * size);
 		displs = malloc(sizeof(int) * size);
 		max_values = (int*) malloc(sizeof(int) * total_lines);
@@ -136,11 +182,12 @@ int main(int argc, char *argv[]){
                 int root,
                 MPI_Comm communicator);
 	*/
+
 	MPI_Gatherv(local_max, primary_count, MPI_INT, max_values, recv_counts, displs, MPI_INT, 0, MPI_COMM_WORLD);
 
 	//clean up and print results
 	if(rank == 0){
-		for (int i = 0; i < total_lines; i++) {
+		for (int i = 300000; i < 350000; i++) {
 			//printf("Line %d: %s\n", i, lines[i]);
 			printf("Line %d max ASCII: %d\n", i + 1, max_values[i]);
 		}
@@ -148,9 +195,16 @@ int main(int argc, char *argv[]){
 		free(displs);
 		free(max_values);
 	}
-	
-	free(local_lines);
+
+
 	free(local_max);
+
+	for (int i = 0; i < MAX_LINES; i++){
+		free(lines[i]);
+	}
+
+	free(local_lines);
+	free(lines);
 
 	// done with MPI
 	MPI_Finalize();
