@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LINES 1000
-#define MAX_LINE_LENGTH 2000
+#define MAX_LINES 1000000
+#define MAX_LINE_LENGTH 3000
 
 
 /// Function to calculate the max ASCII value of a given string
@@ -25,9 +25,6 @@ int max_ascii(const char* str){
 
 /// Main program that implements parallel programming with OpenMP
 int main(){
-	//omp_set_num_threads(20);
-
-	printf("Reading file...\n");
 	// Open file
 	FILE *fd = fopen("/homes/dan/625/wiki_dump.txt", "r");
 	if (fd == NULL)
@@ -37,7 +34,6 @@ int main(){
 	}
 
 
-	printf("File read");
 
 	// Initialize array to store max ascii values
 	int* max_values = (int*) malloc(MAX_LINES * sizeof(int));
@@ -45,6 +41,8 @@ int main(){
 		fprintf(stderr, "Failed to allocate max_values\n");
 		return 1;
 	}
+
+
 
 	// array to hold all lines from file
 	char **lines = (char**)malloc(MAX_LINES * sizeof(char*));
@@ -61,13 +59,16 @@ int main(){
 		}
 	}
 
+
 	// Read all lines into array
 	int total_lines = 0;
-	while (fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL && total_lines < MAX_LINES){
+	while (total_lines < MAX_LINES && fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL){
 		lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
 		total_lines++;
 	}
 	fclose(fd);
+
+
 
 	// Get number of threads and print
 	int num_threads = omp_get_num_threads();
@@ -78,7 +79,8 @@ int main(){
 	// ID of thread
 	int thread_id;
 
-	// begin parallel programming
+
+
 	#pragma omp parallel private(thread_id)
 	{
 		// grab thread_id & print
@@ -89,22 +91,26 @@ int main(){
 		int i, max;
 
 		// Run the for loop in parallel that calculates the max ascii of each line
-		// No need for synchronization 
+		// No need for synchronization
 		#pragma omp for schedule(static, partition)
-		for (i = thread_id * partition; i < (thread_id + 1) * partition - 1; i++){
+		for (i = 0; i < total_lines; i++){ //for (i = thread_id * partition; i < (thread_id + 1) * partition - 1; i++){
 			max = max_ascii(lines[i]);
 			max_values[i] = max;
 		}
 	}
+
 
 	// All threads merge, print out first 100 lines
 	for (int i = 0; i < 100; i++)
 		fprintf(stdout, "Line %d max ASCII: %d\n", i, max_values[i]);
 
 
+
+
 	for (int i = 0; i < MAX_LINES; i++)
 		free(lines[i]);
 
+	free(max_values);
 	free(lines);
-}
 
+}
