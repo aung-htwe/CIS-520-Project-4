@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NUM_THREADS 20
+#define NUM_THREADS 16
 #define MAX_LINES 1000000
-#define MAX_LINE_LENGTH 4000
+#define MAX_LINE_LENGTH 2000
 
 char lines[MAX_LINES][MAX_LINE_LENGTH]; // Buffer to store all lines
-int* max_values;
+int max_values[MAX_LINES];		// stores all max value ASCII of lines
 
 pthread_mutex_t lock;					// Mutex for thread-safe updating
 
@@ -45,13 +45,16 @@ void *calculate_lines(void *thread_arg){
 	int start = thread_location->start;
 	int end = thread_location->end;
 
-	for (i = start; i < end; i++) {
-		max = max_ascii(lines[i]);
 
-		//Protect access to shared result array
-		pthread_mutex_lock(&lock);
-		max_values[i] = max;
-		pthread_mutex_unlock(&lock);
+	for (i = start; i < end; i++) {
+		if (i < MAX_LINES){
+			max = max_ascii(lines[i]);
+
+			//Protect access to shared result array
+			pthread_mutex_lock(&lock);
+			max_values[i] = max;
+			pthread_mutex_unlock(&lock);
+		}
   	}
 
 	// terminates the thread
@@ -67,14 +70,14 @@ int main(){
 		exit(EXIT_FAILURE);
 	}
 
-	max_values = (int*) malloc(MAX_LINES * sizeof(int));
+
 
 	pthread_mutex_init(&lock, NULL);
 
 	int total_lines = 0;
 
 	// Read all lines into memory
-    	while (fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL && total_lines < MAX_LINES) {
+    	while (total_lines < MAX_LINES && fgets(lines[total_lines], MAX_LINE_LENGTH, fd) != NULL) {
         	// Strip newline if needed
         	lines[total_lines][strcspn(lines[total_lines], "\n")] = '\0';
         	total_lines++;
@@ -113,7 +116,7 @@ int main(){
 	pthread_mutex_destroy(&lock);
 
 	// Print first 10 results as sample
-	for (int i = 0; i < 50 && i < total_lines; i++) {
+	for (int i = 0; i < 100 && i < total_lines; i++) {
 	//printf("Line %d: %s\n", i, lines[i]);
     	printf("Line %d max ASCII: %d\n", i, max_values[i]);
     }
