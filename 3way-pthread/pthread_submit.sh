@@ -1,14 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=pthread_ASCII
 #SBATCH --mem-per-cpu=1G
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=20
 #SBATCH --constraint=moles
 #SBATCH --mail-type=ALL
 
 
-$HOME/hw4/build/3way-pthread/pthread_ascii
+gcc -pthread main.c -o pthread_ASCII
 
-perf stat echo "Initializing perf"
 
-perf stat -e cycles,instructions,cache-references,cache-misses,branches,branch-misses 
+
+perf stat -r 5 -e task-clock,cache-references,cache-misses,branches,branch-misses ./pthread_ASCII
+
+#sleep 60
