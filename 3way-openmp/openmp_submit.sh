@@ -6,8 +6,12 @@
 #SBATCH --constraint=moles
 #SBATCH --mail-type=ALL
 
-export OMP_NUM_THREADS=20
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
 
 gcc -fopenmp main.c -o openmp_ASCII
 
-./openmp_ASCII
+
+perf stat -r 5 -e task-clock,cache-references,cache-misses,branches,branch-misses ./openmp_ASCII
+
+
+#sleep 60
