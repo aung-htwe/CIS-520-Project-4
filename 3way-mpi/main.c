@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define MAX_LINES 1000000
-#define MAX_LINE_LENGTH 3000
+#define MAX_LINE_LENGTH 2100
 
 //char lines[MAX_LINES][MAX_LINE_LENGTH]; // Buffer to store all lines
 int* max_values;
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]){
 
 	//clean up and print results
 	if(rank == 0){
-		for (int i = 300000; i < 350000; i++) {
+		for (int i = 0; i < 100; i++) {
 			//printf("Line %d: %s\n", i, lines[i]);
 			printf("Line %d max ASCII: %d\n", i + 1, max_values[i]);
 		}
